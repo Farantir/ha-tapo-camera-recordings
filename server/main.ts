@@ -164,8 +164,10 @@ Deno.serve({ port: config.port, hostname: config.host }, async (req, info) => {
 
   try {
     // The health check runs before anything else so an unauthenticated
-    // container probe still reports the app as up.
-    if (path === "/api/health") return json({ ok: true });
+    // container probe still reports the app as up. It also reports whether a
+    // password arrived, which is the quickest way to tell a stale image (this
+    // route 404s) from an unset AUTH_PASSWORD (`auth: "off"`).
+    if (path === "/api/health") return json({ ok: true, auth: auth.enabled ? "on" : "off" });
 
     if (path === "/api/login" && req.method === "POST") {
       return await auth.handleLogin(req, info.remoteAddr);

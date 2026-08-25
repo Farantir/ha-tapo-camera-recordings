@@ -2,6 +2,12 @@ services:
   tapo-viewer:
     build: .
     image: tapo-viewer:latest
+    # Without this, `docker compose up -d` skips the build whenever the tag
+    # already exists locally — so a redeploy after a git pull silently keeps
+    # running the old code. "build" makes Compose rebuild every single time;
+    # Docker's layer cache keeps that near-instant when nothing changed, and
+    # a changed COPY layer invalidates the cache on its own.
+    pull_policy: build
     container_name: ${CONTAINER_NAME:-tapo-viewer}
     restart: ${RESTART_POLICY:-unless-stopped}
     # uid:gid the process runs as. A bind mount keeps its host ownership,

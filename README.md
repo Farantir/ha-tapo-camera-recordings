@@ -91,6 +91,9 @@ How it works:
 - Everything is behind the login: the API, the media files and the app itself. Only the login page,
   its two assets and `GET /api/health` (the container health check) answer without a session.
 
+`GET /api/health` answers `{"ok":true,"auth":"on"}` or `"off"` without a session, so you can check
+from outside whether the running container actually picked the password up.
+
 Leaving `AUTH_PASSWORD` empty keeps the old behaviour — no login, no session, open to anyone who can
 reach the port — and the server says so on startup.
 
@@ -105,8 +108,13 @@ with a default, so the same compose file works unchanged on any host.
 
 ```sh
 cp .env.example .env   # adjust
-docker compose up -d --build
+docker compose up -d
 ```
+
+The service sets `pull_policy: build`, so every `up` rebuilds the image from the current source.
+Without it Compose skips the build whenever `tapo-viewer:latest` already exists, and a redeploy
+after a `git pull` silently keeps running the old code. Docker's layer cache makes the rebuild
+near-instant when nothing changed.
 
 | Variable         | Default          | Meaning                                                       |
 | ---------------- | ---------------- | ------------------------------------------------------------- |
@@ -143,7 +151,7 @@ port-forward it.
 | `POST /api/reindex`                                | Rescan now                                                   |
 | `POST /api/login`                                  | Exchange the password for a session cookie (public)          |
 | `POST /api/logout`                                 | Drop the session cookie                                      |
-| `GET /api/health`                                  | Liveness probe; the only public API route (public)           |
+| `GET /api/health`                                  | Liveness probe + `auth: on\|off`; the only public API route  |
 | `GET /media/<camera>/<thumbs\|videos>/<key>.<ext>` | Media, with range support                                    |
 
 ## License
