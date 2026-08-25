@@ -6,3 +6,5 @@ tapo/
 claude/
 
 .DS_Store
+
+.env

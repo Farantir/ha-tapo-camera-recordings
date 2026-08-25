@@ -4,3 +4,4 @@ tapo/
 claude/
 server/*_test.ts
 web/*_test.ts
+.env

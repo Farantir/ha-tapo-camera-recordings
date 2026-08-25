@@ -64,10 +64,25 @@ with DST disabled, so a raw filename timestamp runs one hour ahead of true UTC. 
 
 ## Deployment
 
-```yaml
-volumes:
-  - /volume1/tapo:/data:ro
+Nothing in `docker-compose.yml` is hardcoded: every host-side setting is an environment variable
+with a default, so the same compose file works unchanged on any host.
+
+```sh
+cp .env.example .env   # adjust
+docker compose up -d --build
 ```
+
+| Variable         | Default          | Meaning                                                 |
+| ---------------- | ---------------- | ------------------------------------------------------- |
+| `TAPO_HOST_PATH` | `/volume1/tapo`  | Backup folder on the host, mounted read-only at `/data` |
+| `HTTP_PORT`      | `8123`           | Published port — mind that Home Assistant also uses it  |
+| `BIND_ADDRESS`   | `0.0.0.0`        | Host interface to publish on                            |
+| `CONTAINER_NAME` | `tapo-viewer`    | Container name                                          |
+| `RESTART_POLICY` | `unless-stopped` | Docker restart policy                                   |
+
+The app-side variables above — `DISPLAY_TZ`, `TS_OFFSET_SECONDS`, `RESCAN_INTERVAL_S` — are passed
+into the container by the same file. `TAPO_ROOT`, `PORT` and `HOST` are fixed inside the image.
+
 
 The image runs as a non-root user and the process is granted read access to the mount only, so the
 footage cannot be modified from inside the container.

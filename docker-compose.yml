@@ -2,15 +2,17 @@ services:
   tapo-viewer:
     build: .
     image: tapo-viewer:latest
-    container_name: tapo-viewer
-    restart: unless-stopped
+    container_name: ${CONTAINER_NAME:-tapo-viewer}
+    restart: ${RESTART_POLICY:-unless-stopped}
     ports:
-      - "8123:8000"
+      # BIND_ADDRESS 0.0.0.0 exposes the port on every interface; narrow it to a
+      # LAN address if the host also faces the internet. There is no auth.
+      - "${BIND_ADDRESS:-0.0.0.0}:${HTTP_PORT:-8123}:8000"
     volumes:
-      # should point to your tapo backup folder
-      - /volume1/tapo:/data:ro
+      # TAPO_HOST_PATH is your tapo backup folder on the Docker host.
+      - ${TAPO_HOST_PATH:-/volume1/tapo}:/data:ro
     environment:
       # set that to your local timezone as tapo uses that for its timestamps
-      DISPLAY_TZ: Europe/Berlin
-      TS_OFFSET_SECONDS: "-3600"
-      RESCAN_INTERVAL_S: "1800"
+      DISPLAY_TZ: ${DISPLAY_TZ:-Europe/Berlin}
+      TS_OFFSET_SECONDS: "${TS_OFFSET_SECONDS:--3600}"
+      RESCAN_INTERVAL_S: "${RESCAN_INTERVAL_S:-1800}"
