@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tapo Events</title>
+    <link rel="stylesheet" href="/app.css">
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📹</text></svg>"
+    >
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-row">
+        <h1>Tapo Events</h1>
+        <div class="topbar-meta">
+          <span id="result-count" class="count"></span>
+          <button id="reindex" class="ghost" title="Rescan the recordings folder">Rescan</button>
+        </div>
+      </div>
+      <div id="camera-chips" class="chips" role="group" aria-label="Filter by camera"></div>
+      <div id="range-bar" class="range-bar hidden">
+        <span id="range-label"></span>
+        <button id="range-clear" class="ghost small">Clear range</button>
+      </div>
+    </header>
+
+    <section class="timeline-panel">
+      <div class="panel-head">
+        <h2>Timeline</h2>
+        <div class="bucket-toggle" role="group" aria-label="Resolution">
+          <button data-bucket="day" class="active">Days</button>
+          <button data-bucket="hour">Hours</button>
+        </div>
+      </div>
+      <div id="density" class="density"></div>
+      <p id="timeline-hint" class="hint">
+        Drag to select a range · click a bar to filter that day
+      </p>
+    </section>
+
+    <div class="overview">
+      <div class="overview-main">
+        <main id="list" class="list"></main>
+        <div id="sentinel" class="sentinel"></div>
+        <p id="list-status" class="list-status"></p>
+      </div>
+      <aside id="daybar" class="daybar" aria-label="Day timeline">
+        <div class="daybar-head">
+          <h2 class="daybar-day"></h2>
+          <div class="zoom-controls" role="group" aria-label="Zoom day timeline">
+            <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
+            <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
+            <button type="button" data-zoom="reset" aria-label="Whole day">⤢</button>
+          </div>
+        </div>
+        <div class="daybar-plot"></div>
+        <p class="daybar-empty hint hidden">No events</p>
+      </aside>
+    </div>
+
+    <div id="viewer" class="viewer hidden" role="dialog" aria-modal="true" aria-label="Event"></div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

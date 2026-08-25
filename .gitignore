@@ -1,0 +1,8 @@
+# Camera footage — never commit. This repo is public, and TAPO_ROOT is a
+# mount/bind at runtime, so the tree is only ever a local working copy.
+tapo/
+
+# Working notes from the build-out — not part of the deliverable.
+claude/
+
+.DS_Store

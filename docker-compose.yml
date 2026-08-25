@@ -1,0 +1,16 @@
+services:
+  tapo-viewer:
+    build: .
+    image: tapo-viewer:latest
+    container_name: tapo-viewer
+    restart: unless-stopped
+    ports:
+      - "8123:8000"
+    volumes:
+      # should point to your tapo backup folder
+      - /volume1/tapo:/data:ro
+    environment:
+      # set that to your local timezone as tapo uses that for its timestamps
+      DISPLAY_TZ: Europe/Berlin
+      TS_OFFSET_SECONDS: "-3600"
+      RESCAN_INTERVAL_S: "1800"

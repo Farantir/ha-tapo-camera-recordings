@@ -1,0 +1,6 @@
+tapo/
+.git/
+*.md
+claude/
+server/*_test.ts
+web/*_test.ts
