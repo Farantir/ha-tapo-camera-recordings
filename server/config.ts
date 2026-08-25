@@ -35,4 +35,15 @@ export const config = {
 
   displayTz: Deno.env.get("DISPLAY_TZ") ?? "Europe/Berlin",
   rescanIntervalS: num("RESCAN_INTERVAL_S", 1800),
+
+  /** Shared login password. Empty disables authentication entirely. */
+  authPassword: Deno.env.get("AUTH_PASSWORD") ?? "",
+  /** How long a session cookie stays valid. Default 12 hours. */
+  sessionTtlS: num("SESSION_TTL_S", 12 * 3600),
+  /**
+   * Key the session cookie is signed with. Left empty a random one is drawn at
+   * startup, so a restart logs everybody out — set it to keep sessions across
+   * restarts (and to share them between replicas).
+   */
+  authSecret: Deno.env.get("AUTH_SECRET") ?? "",
 };

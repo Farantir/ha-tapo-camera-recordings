@@ -1,5 +1,6 @@
 import { serveDir, serveFile } from "@std/http/file-server";
 import { join } from "jsr:@std/path@1";
+import { Auth, safeNextPath } from "./auth.ts";
 import { config } from "./config.ts";
 import { isValidKey } from "./scan.ts";
 import {
@@ -21,6 +22,20 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
+/**
+ * XHR callers get a 401 they can act on; a browser asking for a page is sent
+ * to the login form with the path it wanted, so the deep link survives.
+ */
+function unauthorized(url: URL, path: string): Response {
+  if (path.startsWith("/api/") || path.startsWith("/media/")) {
+    return json({ error: "unauthenticated" }, 401);
+  }
+  const target = new URL("/login", url);
+  const next = path + url.search;
+  if (next !== "/") target.searchParams.set("next", safeNextPath(next));
+  return Response.redirect(target, 302);
+}
+
 function parseCameras(params: URLSearchParams): Set<string> | undefined {
   const raw = params.get("cameras");
   if (raw === null || raw === "") return undefined;
@@ -38,7 +53,8 @@ function parseNumber(params: URLSearchParams, name: string): number | undefined 
 
 async function handleApi(req: Request, path: string, params: URLSearchParams): Promise<Response> {
   if (path === "/api/cameras") {
-    return json({ cameras: listCameras(), displayTz: config.displayTz });
+    // `authEnabled` only tells the UI whether to offer a sign-out button.
+    return json({ cameras: listCameras(), displayTz: config.displayTz, authEnabled: auth.enabled });
   }
 
   if (path === "/api/events") {
@@ -76,6 +92,10 @@ async function handleApi(req: Request, path: string, params: URLSearchParams): P
     return json({ generation: index.generation, events: index.events.length });
   }
 
+  if (path === "/api/logout" && req.method === "POST") {
+    return auth.clearSessionCookie(json({ ok: true }), req);
+  }
+
   return json({ error: "unknown endpoint" }, 404);
 }
 
@@ -109,21 +129,75 @@ async function handleMedia(req: Request, path: string): Promise<Response> {
   }
 }
 
+const auth = new Auth({
+  password: config.authPassword,
+  ttlS: config.sessionTtlS,
+  secret: config.authSecret,
+});
+
+/**
+ * Reachable without a session. Everything else needs one. The login page's own
+ * stylesheet and script have to be in here, or the form could never render.
+ */
+function isPublicPath(req: Request, path: string): boolean {
+  if (path === "/api/health") return true;
+  if (path === "/api/login" && req.method === "POST") return true;
+  if (path === "/login" || path === "/login.css" || path === "/login.js") return true;
+  return false;
+}
+
 const index = await reindex();
 console.log(
   `indexed ${index.events.length} events across ${index.cameras.length} cameras ` +
     `from ${config.tapoRoot}`,
 );
+if (auth.enabled) {
+  console.log(`authentication on, sessions last ${config.sessionTtlS}s`);
+} else {
+  console.warn("AUTH_PASSWORD is unset — the viewer is open to anyone who can reach the port");
+}
 startBackgroundRescan();
 
-Deno.serve({ port: config.port, hostname: config.host }, async (req) => {
+Deno.serve({ port: config.port, hostname: config.host }, async (req, info) => {
   const url = new URL(req.url);
   const path = url.pathname;
 
   try {
-    if (path.startsWith("/api/")) return await handleApi(req, path, url.searchParams);
-    if (path.startsWith("/media/")) return await handleMedia(req, path);
-    return await serveDir(req, { fsRoot: config.webRoot, quiet: true });
+    // The health check runs before anything else so an unauthenticated
+    // container probe still reports the app as up.
+    if (path === "/api/health") return json({ ok: true });
+
+    if (path === "/api/login" && req.method === "POST") {
+      return await auth.handleLogin(req, info.remoteAddr);
+    }
+
+    if (path === "/login") {
+      // Nobody needs the form when auth is off, or when they already hold a
+      // live session.
+      if (!auth.enabled || await auth.isAuthenticated(req)) {
+        return Response.redirect(new URL("/", url), 302);
+      }
+      return await serveFile(req, join(config.webRoot, "login.html"));
+    }
+
+    let session: number | null = null;
+    if (auth.enabled && !isPublicPath(req, path)) {
+      session = await auth.isAuthenticated(req);
+      if (session === null) return unauthorized(url, path);
+    }
+
+    let response: Response;
+    if (path.startsWith("/api/")) response = await handleApi(req, path, url.searchParams);
+    else if (path.startsWith("/media/")) response = await handleMedia(req, path);
+    else response = await serveDir(req, { fsRoot: config.webRoot, quiet: true });
+
+    if (session !== null && auth.shouldRenew(session)) {
+      // serveDir hands back an immutable response for some paths, so the
+      // cookie goes onto a copy we own.
+      response = new Response(response.body, response);
+      response = await auth.setSessionCookie(response, req);
+    }
+    return response;
   } catch (err) {
     console.error(`${req.method} ${path} failed:`, err);
     return json({ error: "internal error" }, 500);

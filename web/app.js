@@ -1,4 +1,4 @@
-import { fetchCameras, fetchEvent, fetchHistogram, reindex as apiReindex } from "./api.js";
+import { fetchCameras, fetchEvent, fetchHistogram, logout, reindex as apiReindex } from "./api.js";
 import { renderChips } from "./chips.js";
 import { assignCameraColors } from "./colors.js";
 import * as daybar from "./daybar.js";
@@ -109,6 +109,8 @@ function wireTopControls() {
     }
   });
 
+  document.getElementById("logout").addEventListener("click", () => logout());
+
   document.getElementById("range-clear").addEventListener("click", () => {
     update({ from: null, to: null });
   });
@@ -169,6 +171,9 @@ async function main() {
   setTimezone(res.displayTz);
   assignCameraColors(cameras);
   paintCameraCaches();
+
+  // Without a password configured there is no session to end.
+  document.getElementById("logout").classList.toggle("hidden", !res.authEnabled);
 
   list.initList({ onOpen: (event) => update({ event: event.id }) });
   density.initDensity(document.getElementById("density"));
