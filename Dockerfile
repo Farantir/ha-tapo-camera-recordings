@@ -9,6 +9,10 @@ COPY web/ ./web/
 # Vendor the JSR deps into the image so startup needs no network.
 RUN deno install --entrypoint --frozen server/main.ts
 
+# The container can be told to run as whichever uid owns the footage on the
+# host (PUID/PGID), and that uid still has to reach the module cache.
+RUN chmod -R a+rwX "$DENO_DIR"
+
 ENV TAPO_ROOT=/data \
     PORT=8000 \
     HOST=0.0.0.0

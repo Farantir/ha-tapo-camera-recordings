@@ -4,6 +4,10 @@ services:
     image: tapo-viewer:latest
     container_name: ${CONTAINER_NAME:-tapo-viewer}
     restart: ${RESTART_POLICY:-unless-stopped}
+    # uid:gid the process runs as. A bind mount keeps its host ownership,
+    # so this has to be a user that can read TAPO_HOST_PATH. Defaults to
+    # the image's own non-root "deno" user.
+    user: "${PUID:-1000}:${PGID:-1000}"
     ports:
       # BIND_ADDRESS 0.0.0.0 exposes the port on every interface; narrow it to a
       # LAN address if the host also faces the internet. There is no auth.

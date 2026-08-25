@@ -72,20 +72,24 @@ cp .env.example .env   # adjust
 docker compose up -d --build
 ```
 
-| Variable         | Default          | Meaning                                                 |
-| ---------------- | ---------------- | ------------------------------------------------------- |
-| `TAPO_HOST_PATH` | `/volume1/tapo`  | Backup folder on the host, mounted read-only at `/data` |
-| `HTTP_PORT`      | `8123`           | Published port — mind that Home Assistant also uses it  |
-| `BIND_ADDRESS`   | `0.0.0.0`        | Host interface to publish on                            |
-| `CONTAINER_NAME` | `tapo-viewer`    | Container name                                          |
-| `RESTART_POLICY` | `unless-stopped` | Docker restart policy                                   |
+| Variable         | Default          | Meaning                                                       |
+| ---------------- | ---------------- | ------------------------------------------------------------- |
+| `TAPO_HOST_PATH` | `/volume1/tapo`  | Backup folder on the host, mounted read-only at `/data`       |
+| `HTTP_PORT`      | `8123`           | Published port — mind that Home Assistant also uses it        |
+| `BIND_ADDRESS`   | `0.0.0.0`        | Host interface to publish on                                  |
+| `PUID` / `PGID`  | `1000`           | uid:gid the container runs as; must be able to read the mount |
+| `CONTAINER_NAME` | `tapo-viewer`    | Container name                                                |
+| `RESTART_POLICY` | `unless-stopped` | Docker restart policy                                         |
 
 The app-side variables above — `DISPLAY_TZ`, `TS_OFFSET_SECONDS`, `RESCAN_INTERVAL_S` — are passed
 into the container by the same file. `TAPO_ROOT`, `PORT` and `HOST` are fixed inside the image.
 
-
 The image runs as a non-root user and the process is granted read access to the mount only, so the
 footage cannot be modified from inside the container.
+
+A bind mount keeps its ownership from the host, so a `PermissionDenied` on startup means the uid the
+container runs as cannot read the footage. Find the owner with `ls -ldn <TAPO_HOST_PATH>` and either
+set `PUID`/`PGID` to those numbers, or make the folder readable for uid 1000.
 
 **There is no authentication.** Keep the port on the LAN and reach it from outside over a VPN — do
 not port-forward it.

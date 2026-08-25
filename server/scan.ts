@@ -69,6 +69,26 @@ async function readStems(dir: string, ext: string): Promise<Map<string, [number,
   return stems;
 }
 
+/**
+ * In a container the root is a bind mount, so a failure here is a host-side
+ * mistake rather than a bug — a bare errno sends people looking in the wrong
+ * place. Name the cause instead.
+ */
+function rootError(root: string, err: unknown): Error {
+  if (err instanceof Deno.errors.NotFound) {
+    return new Error(`TAPO_ROOT ${root} does not exist — is the folder mounted?`);
+  }
+  if (err instanceof Deno.errors.PermissionDenied) {
+    return new Error(
+      `TAPO_ROOT ${root} is not readable by the user the process runs as — ` +
+        `a bind mount keeps its ownership from the host. Either make the footage ` +
+        `readable for that user, or run the container as the uid that owns it ` +
+        `(PUID/PGID in docker-compose.yml).`,
+    );
+  }
+  return err instanceof Error ? err : new Error(String(err));
+}
+
 let generation = 0;
 
 export async function scan(root: string = config.tapoRoot): Promise<TapoIndex> {
@@ -76,8 +96,12 @@ export async function scan(root: string = config.tapoRoot): Promise<TapoIndex> {
   const events: TapoEvent[] = [];
 
   const dirs: string[] = [];
-  for await (const entry of Deno.readDir(root)) {
-    if (entry.isDirectory && !entry.name.startsWith(".")) dirs.push(entry.name);
+  try {
+    for await (const entry of Deno.readDir(root)) {
+      if (entry.isDirectory && !entry.name.startsWith(".")) dirs.push(entry.name);
+    }
+  } catch (err) {
+    throw rootError(root, err);
   }
   dirs.sort();
 
