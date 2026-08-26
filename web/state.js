@@ -5,6 +5,7 @@ const listeners = new Set();
 
 export const state = {
   cameras: [], // selected camera ids; empty means "all"
+  tags: [], // selected tags; empty means "all". OR-ed, like cameras
   from: null, // true-UTC epoch seconds, inclusive
   to: null,
   bucket: "day",
@@ -14,6 +15,7 @@ export const state = {
 function readUrl() {
   const params = new URLSearchParams(location.search);
   state.cameras = (params.get("cam") ?? "").split(",").filter(Boolean);
+  state.tags = (params.get("tag") ?? "").split(",").filter(Boolean);
   state.from = params.has("from") ? Number(params.get("from")) : null;
   state.to = params.has("to") ? Number(params.get("to")) : null;
   state.bucket = params.get("bucket") === "hour" ? "hour" : "day";
@@ -23,6 +25,7 @@ function readUrl() {
 function writeUrl(replace) {
   const params = new URLSearchParams();
   if (state.cameras.length) params.set("cam", state.cameras.join(","));
+  if (state.tags.length) params.set("tag", state.tags.join(","));
   if (state.from !== null) params.set("from", String(state.from));
   if (state.to !== null) params.set("to", String(state.to));
   if (state.bucket !== "day") params.set("bucket", state.bucket);
@@ -62,6 +65,13 @@ export function toggleCamera(id) {
   update({ cameras: next, event: null });
 }
 
+export function toggleTag(tag) {
+  const next = state.tags.includes(tag)
+    ? state.tags.filter((t) => t !== tag)
+    : [...state.tags, tag];
+  update({ tags: next, event: null });
+}
+
 export function initState() {
   readUrl();
   globalThis.addEventListener("popstate", () => {
@@ -72,5 +82,5 @@ export function initState() {
 
 /** The query fields that change which events are listed. */
 export function filterKey() {
-  return JSON.stringify([state.cameras, state.from, state.to]);
+  return JSON.stringify([state.cameras, state.tags, state.from, state.to]);
 }

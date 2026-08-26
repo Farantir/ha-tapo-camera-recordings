@@ -211,7 +211,7 @@ async function loadDayTimeline(event) {
 
   let dayEvents;
   try {
-    dayEvents = await fetchDayEvents(event.day, dayStart, state.cameras);
+    dayEvents = await fetchDayEvents(event.day, dayStart, state.cameras, state.tags);
   } catch {
     return;
   }

@@ -1,5 +1,5 @@
 import { fetchEvents, thumbUrl } from "./api.js";
-import { displayLabel } from "./chips.js";
+import { displayLabel, tagLabel } from "./chips.js";
 import { cameraColor } from "./colors.js";
 import { clock, dayHeading, duration, plural, relativeAge } from "./format.js";
 import { filterKey, state, update } from "./state.js";
@@ -70,6 +70,7 @@ async function loadMore() {
   try {
     const result = await fetchEvents({
       cameras: state.cameras,
+      tags: state.tags,
       from: state.from,
       to: state.to,
       cursor,
@@ -187,6 +188,15 @@ function buildRow(event) {
   ageSpan.textContent = relativeAge(event.start);
   sub.appendChild(ageSpan);
 
+  if (event.label) {
+    const tag = document.createElement("span");
+    // The row shows only the deepest resolved name; the rest of the chain is
+    // what the filter matches on, and would just be noise here.
+    tag.className = "row-tag" + (event.label === "no_event" ? " quiet" : "");
+    tag.textContent = tagLabel(event.label);
+    sub.appendChild(tag);
+  }
+
   meta.append(time, sub);
   btn.append(thumb, meta);
   btn.addEventListener("click", () => onOpenCb?.(event));
@@ -224,7 +234,10 @@ function showEmptyState() {
   reset.type = "button";
   reset.className = "ghost small";
   reset.textContent = "Reset filters";
-  reset.addEventListener("click", () => update({ cameras: [], from: null, to: null, event: null }));
+  reset.addEventListener(
+    "click",
+    () => update({ cameras: [], tags: [], from: null, to: null, event: null }),
+  );
   div.appendChild(reset);
   listEl.appendChild(div);
 }

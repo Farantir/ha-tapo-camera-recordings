@@ -1,5 +1,5 @@
 import { fetchCameras, fetchEvent, fetchHistogram, logout, reindex as apiReindex } from "./api.js";
-import { renderChips } from "./chips.js";
+import { renderChips, renderTagChips } from "./chips.js";
 import { assignCameraColors } from "./colors.js";
 import * as daybar from "./daybar.js";
 import * as daytimeline from "./daytimeline.js";
@@ -13,6 +13,7 @@ import * as viewer from "./viewer.js";
 const FOURTEEN_DAYS = 14 * 86400;
 
 let cameras = [];
+let tagVocabulary = { buckets: [], labels: [] };
 
 function watchTopbarHeight() {
   const topbar = document.querySelector(".topbar");
@@ -31,6 +32,10 @@ function paintCameraCaches() {
 
 function renderChipsNow() {
   renderChips(document.getElementById("camera-chips"), cameras, state.cameras);
+}
+
+function renderTagChipsNow() {
+  renderTagChips(document.getElementById("tag-chips"), tagVocabulary, state.tags);
 }
 
 function updateRangeBar() {
@@ -53,7 +58,12 @@ function histogramRange() {
 
 async function refreshDensity() {
   const range = histogramRange();
-  const data = await fetchHistogram({ cameras: state.cameras, bucket: state.bucket, ...range });
+  const data = await fetchHistogram({
+    cameras: state.cameras,
+    tags: state.tags,
+    bucket: state.bucket,
+    ...range,
+  });
   density.renderDensity(data, { bucket: state.bucket, from: state.from, to: state.to });
 
   const hint = document.getElementById("timeline-hint");
@@ -97,10 +107,13 @@ function wireTopControls() {
       clearDayCache();
       const res = await fetchCameras();
       cameras = res.cameras;
+      // A tagger run between rescans changes the vocabulary, not just counts.
+      tagVocabulary = res.tags ?? { buckets: [], labels: [] };
       setTimezone(res.displayTz);
       assignCameraColors(cameras);
       paintCameraCaches();
       renderChipsNow();
+      renderTagChipsNow();
       await refreshDensity();
       list.refresh();
       daybar.refresh();
@@ -122,6 +135,7 @@ function wireTopControls() {
 
 function wireStateSubscription() {
   let prevCameras = JSON.stringify(state.cameras);
+  let prevTags = JSON.stringify(state.tags);
   let prevFrom = state.from;
   let prevTo = state.to;
   let prevBucket = state.bucket;
@@ -129,18 +143,20 @@ function wireStateSubscription() {
 
   subscribe(() => {
     const camerasChanged = JSON.stringify(state.cameras) !== prevCameras;
+    const tagsChanged = JSON.stringify(state.tags) !== prevTags;
     const rangeChanged = state.from !== prevFrom || state.to !== prevTo;
     const bucketChanged = state.bucket !== prevBucket;
     const eventChanged = state.event !== prevEvent;
 
     if (camerasChanged) renderChipsNow();
+    if (tagsChanged) renderTagChipsNow();
     if (rangeChanged) updateRangeBar();
-    if (camerasChanged || rangeChanged) {
+    if (camerasChanged || tagsChanged || rangeChanged) {
       list.refresh();
       daybar.refresh();
     }
 
-    if (camerasChanged || bucketChanged) {
+    if (camerasChanged || tagsChanged || bucketChanged) {
       refreshDensity();
     } else if (rangeChanged) {
       density.updateBrush(state.from, state.to);
@@ -155,6 +171,7 @@ function wireStateSubscription() {
     if (eventChanged) openFromState();
 
     prevCameras = JSON.stringify(state.cameras);
+    prevTags = JSON.stringify(state.tags);
     prevFrom = state.from;
     prevTo = state.to;
     prevBucket = state.bucket;
@@ -168,6 +185,7 @@ async function main() {
 
   const res = await fetchCameras();
   cameras = res.cameras;
+  tagVocabulary = res.tags ?? { buckets: [], labels: [] };
   setTimezone(res.displayTz);
   assignCameraColors(cameras);
   paintCameraCaches();
@@ -181,6 +199,7 @@ async function main() {
   daybar.initDaybar();
 
   renderChipsNow();
+  renderTagChipsNow();
   updateRangeBar();
   wireTopControls();
   wireStateSubscription();

@@ -3,7 +3,7 @@ import type { TapoEvent } from "./scan.ts";
 import { histogram, queryEvents } from "./store.ts";
 import { localParts } from "./tz.ts";
 
-function makeEvent(camera: string, start: number, duration = 60): TapoEvent {
+function makeEvent(camera: string, start: number, duration = 60, tags: string[] = []): TapoEvent {
   const end = start + duration;
   const parts = localParts(start);
   return {
@@ -17,6 +17,8 @@ function makeEvent(camera: string, start: number, duration = 60): TapoEvent {
     hasVideo: true,
     day: parts.dayKey,
     secondsOfDay: parts.secondsOfDay,
+    tags,
+    label: tags.at(-1) ?? null,
   };
 }
 

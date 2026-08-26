@@ -21,14 +21,72 @@ services:
     volumes:
       # TAPO_HOST_PATH is your tapo backup folder on the Docker host.
       - ${TAPO_HOST_PATH:-/volume1/tapo}:/data:ro
+      # The tagger writes here, the viewer only reads. This is the one channel
+      # between them; the footage mount stays read-only for both.
+      - tags:/tags:ro
     environment:
       # set that to your local timezone as tapo uses that for its timestamps
       DISPLAY_TZ: ${DISPLAY_TZ:-Europe/Berlin}
       TS_OFFSET_SECONDS: "${TS_OFFSET_SECONDS:--3600}"
       RESCAN_INTERVAL_S: "${RESCAN_INTERVAL_S:-1800}"
+      # Where to look for the tagger's output. Unset it to turn tags off.
+      TAGS_FILE: "${TAGS_FILE:-/tags/tags.json}"
       # Shared login password. Leave empty and the viewer stays wide open.
       AUTH_PASSWORD: ${AUTH_PASSWORD:-}
       SESSION_TTL_S: "${SESSION_TTL_S:-43200}"
       # Set to keep people logged in across restarts; empty means a new random
       # key each start, which signs everyone out.
       AUTH_SECRET: ${AUTH_SECRET:-}
+
+  # Analyses each recording and writes /tags/tags.json. Optional: leave it out
+  # and the viewer simply shows no tag filters.
+  #
+  # It is deliberately not part of the viewer's image — the models are ~340 MB
+  # and only this service needs ffmpeg, numpy and ONNX Runtime.
+  tapo-tagger:
+    build: ./tagger
+    image: tapo-tagger:latest
+    pull_policy: build
+    container_name: ${TAGGER_CONTAINER_NAME:-tapo-tagger}
+    restart: ${TAGGER_RESTART_POLICY:-unless-stopped}
+    # Same uid as the viewer so both can reach the footage; the tagger also
+    # needs to write /tags and /models.
+    user: "${PUID:-1000}:${PGID:-1000}"
+    # The tagger needs the network exactly once, to download the models into
+    # the /models volume on first start. Everything after that — decoding,
+    # detection, classification — is local. Once `docker compose logs
+    # tapo-tagger` has shown "models ready", uncomment the next line and
+    # recreate the service to cut it off from the network for good; the
+    # download step then sees the files already present and skips.
+    # network_mode: none
+    volumes:
+      - ${TAPO_HOST_PATH:-/volume1/tapo}:/data:ro
+      - tags:/tags
+      # Models are downloaded once on first start and kept here, so a restart
+      # or an image rebuild does not re-fetch them.
+      - models:/models
+    environment:
+      # 0 runs one pass and exits; anything else re-checks on that interval.
+      # A few new recordings a day means there is nothing to do most passes.
+      INTERVAL_S: "${TAGGER_INTERVAL_S:-3600}"
+      # Detector size trades accuracy for time: yolov10n (9 MB) is roughly ten
+      # times quicker than yolov10x (118 MB) and noticeably worse on small,
+      # distant animals. Changing this re-tags nothing by itself — delete
+      # tags.json, or bump the files, to force a re-analysis.
+      DETECTOR: "${TAGGER_DETECTOR:-yolov10x}"
+      # Frames per clip handed to the detector. The motion scan looks at all of
+      # them and picks these; more frames means a better chance of catching a
+      # two-second visit, at a linear cost.
+      MAX_FRAMES: "${TAGGER_MAX_FRAMES:-24}"
+      # How much of the probability mass a taxon needs before the tag descends
+      # to it. Lower means more species names and more mistakes; higher means
+      # more events labelled just "animal" or a family.
+      SPECIES_CONF: "${TAGGER_SPECIES_CONF:-0.55}"
+      # Cap ONNX Runtime's threads on a small box so tagging does not starve
+      # the viewer. 0 lets it decide.
+      THREADS: "${TAGGER_THREADS:-0}"
+      LOG_LEVEL: "${TAGGER_LOG_LEVEL:-INFO}"
+
+volumes:
+  tags:
+  models:

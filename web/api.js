@@ -28,18 +28,20 @@ async function get(path, params) {
 
 export const fetchCameras = () => get("/api/cameras");
 
-export const fetchEvents = ({ cameras, from, to, cursor, limit = 60 }) =>
+export const fetchEvents = ({ cameras, tags, from, to, cursor, limit = 60 }) =>
   get("/api/events", {
     cameras: cameras?.length ? cameras.join(",") : undefined,
+    tags: tags?.length ? tags.join(",") : undefined,
     from,
     to,
     cursor,
     limit,
   });
 
-export const fetchHistogram = ({ cameras, bucket, from, to }) =>
+export const fetchHistogram = ({ cameras, tags, bucket, from, to }) =>
   get("/api/histogram", {
     cameras: cameras?.length ? cameras.join(",") : undefined,
+    tags: tags?.length ? tags.join(",") : undefined,
     bucket,
     from,
     to,

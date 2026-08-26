@@ -36,6 +36,13 @@ export const config = {
   displayTz: Deno.env.get("DISPLAY_TZ") ?? "Europe/Berlin",
   rescanIntervalS: num("RESCAN_INTERVAL_S", 1800),
 
+  /**
+   * Sidecar written by the tagger holding one entry per analysed event. It is
+   * deliberately not inside TAPO_ROOT: the footage mount stays read-only, so
+   * the two processes meet on a separate shared volume. Empty disables tags.
+   */
+  tagsFile: Deno.env.get("TAGS_FILE") || null,
+
   /** Shared login password. Empty disables authentication entirely. */
   authPassword: Deno.env.get("AUTH_PASSWORD") ?? "",
   /** How long a session cookie stays valid. Default 12 hours. */

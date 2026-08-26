@@ -1,5 +1,6 @@
 import { join } from "jsr:@std/path@1";
 import { config } from "./config.ts";
+import { type TagLookup, tagsFor } from "./tags.ts";
 import { localParts } from "./tz.ts";
 
 /** On-disk stem: `<start>-<end>`, both 10-digit epochs. */
@@ -20,6 +21,17 @@ export interface TapoEvent {
   day: string;
   /** Seconds since local midnight — the x coordinate for the day timeline. */
   secondsOfDay: number;
+  /**
+   * Flattened taxonomy chain from the tagger, deepest last — e.g.
+   * `["animal", "mammalia", "carnivora", "felidae", "domestic cat"]`. Empty
+   * means the tagger has not analysed this event yet.
+   */
+  tags: string[];
+  /**
+   * The deepest node the classifier was actually confident about, which is what
+   * the UI shows on the row. Always one of `tags`, so filtering on it works.
+   */
+  label: string | null;
 }
 
 export interface CameraInfo {
@@ -91,7 +103,10 @@ function rootError(root: string, err: unknown): Error {
 
 let generation = 0;
 
-export async function scan(root: string = config.tapoRoot): Promise<TapoIndex> {
+export async function scan(
+  root: string = config.tapoRoot,
+  lookupTags: TagLookup = tagsFor,
+): Promise<TapoIndex> {
   const cameras: CameraInfo[] = [];
   const events: TapoEvent[] = [];
 
@@ -124,8 +139,9 @@ export async function scan(root: string = config.tapoRoot): Promise<TapoIndex> {
       const start = span[0] + config.tsOffsetSeconds;
       const end = span[1] + config.tsOffsetSeconds;
       const parts = localParts(start);
+      const id = `${camera}/${stem}`;
       events.push({
-        id: `${camera}/${stem}`,
+        id,
         camera,
         key: stem,
         start,
@@ -135,6 +151,7 @@ export async function scan(root: string = config.tapoRoot): Promise<TapoIndex> {
         hasVideo: videos.has(stem),
         day: parts.dayKey,
         secondsOfDay: parts.secondsOfDay,
+        ...lookupTags(id),
       });
       if (first === null || start < first) first = start;
       if (last === null || start > last) last = start;

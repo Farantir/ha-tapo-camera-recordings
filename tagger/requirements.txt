@@ -1,0 +1,4 @@
+# CPU-only ONNX Runtime; no torch, no CUDA. Keeps the image ~300 MB.
+onnxruntime==1.23.0
+numpy==2.2.6
+pillow==11.3.0

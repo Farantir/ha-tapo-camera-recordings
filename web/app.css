@@ -137,6 +137,41 @@ button {
   background: linear-gradient(135deg, #4c9aff, #b47cff);
 }
 
+/* The tag strip sits under the cameras and stays absent until a tagger has
+   actually produced a vocabulary. */
+.chips.tags {
+  margin-top: 6px;
+}
+.chip.tag {
+  padding-left: 12px;
+}
+.chip.tag[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+/* The four roots read as states rather than species, so they get a tint. */
+.chip.tag-no-event[aria-pressed="true"] {
+  border-color: #7a8699;
+}
+.chip.tag-animal[aria-pressed="true"] {
+  border-color: #4caf7d;
+}
+.chip.tag-human[aria-pressed="true"] {
+  border-color: #e0a33e;
+}
+.chip.tag-vehicle[aria-pressed="true"] {
+  border-color: #4c9aff;
+}
+.chip.tag-untagged {
+  opacity: 0.6;
+}
+/* Divides the roots from the resolved species without another wrapper. */
+.chip-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--line);
+}
+
 .range-bar {
   display: flex;
   align-items: center;
@@ -350,6 +385,17 @@ button {
   gap: 8px;
   color: var(--muted);
   font-size: 0.82rem;
+}
+.row-tag {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.76rem;
+  color: var(--text);
+  white-space: nowrap;
+}
+.row-tag.quiet {
+  opacity: 0.55;
 }
 .cam-tag {
   display: inline-flex;

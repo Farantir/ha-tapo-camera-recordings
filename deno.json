@@ -1,7 +1,7 @@
 {
   "tasks": {
-    "dev": "deno run --allow-read=tapo,web --allow-env --allow-net --watch=server/ server/main.ts",
-    "start": "deno run --allow-read=tapo,web --allow-env --allow-net server/main.ts",
+    "dev": "deno run --allow-read=tapo,web,tags --allow-env --allow-net --watch=server/ server/main.ts",
+    "start": "deno run --allow-read=tapo,web,tags --allow-env --allow-net server/main.ts",
     "check": "deno check server/*.ts web/*_test.ts",
     "fmt": "deno fmt",
     "lint": "deno lint",

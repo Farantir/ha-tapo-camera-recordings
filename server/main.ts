@@ -10,7 +10,9 @@ import {
   queryEvents,
   reindex,
   startBackgroundRescan,
+  tagVocabulary,
 } from "./store.ts";
+import { tagsState } from "./tags.ts";
 
 const DEFAULT_LIMIT = 60;
 const MAX_LIMIT = 200;
@@ -44,6 +46,18 @@ function parseCameras(params: URLSearchParams): Set<string> | undefined {
   return new Set(raw.split(",").filter(Boolean));
 }
 
+/**
+ * Tags are matched case-insensitively because they come from a taxonomy the
+ * server never validates — an unknown one simply matches nothing, exactly like
+ * an unknown camera.
+ */
+function parseTags(params: URLSearchParams): Set<string> | undefined {
+  const raw = params.get("tags");
+  if (raw === null || raw === "") return undefined;
+  const tags = raw.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+  return tags.length ? new Set(tags) : undefined;
+}
+
 function parseNumber(params: URLSearchParams, name: string): number | undefined {
   const raw = params.get(name);
   if (raw === null || raw === "") return undefined;
@@ -54,13 +68,21 @@ function parseNumber(params: URLSearchParams, name: string): number | undefined 
 async function handleApi(req: Request, path: string, params: URLSearchParams): Promise<Response> {
   if (path === "/api/cameras") {
     // `authEnabled` only tells the UI whether to offer a sign-out button.
-    return json({ cameras: listCameras(), displayTz: config.displayTz, authEnabled: auth.enabled });
+    // `tags` is the vocabulary the tagger produced, so the UI never ships a
+    // hardcoded species list; it refreshes with the index on every rescan.
+    return json({
+      cameras: listCameras(),
+      displayTz: config.displayTz,
+      authEnabled: auth.enabled,
+      tags: tagVocabulary(),
+    });
   }
 
   if (path === "/api/events") {
     const limit = Math.min(MAX_LIMIT, Math.max(1, parseNumber(params, "limit") ?? DEFAULT_LIMIT));
     const result = queryEvents({
       cameras: parseCameras(params),
+      tags: parseTags(params),
       from: parseNumber(params, "from"),
       to: parseNumber(params, "to"),
       cursor: params.get("cursor") ?? undefined,
@@ -77,6 +99,8 @@ async function handleApi(req: Request, path: string, params: URLSearchParams): P
         parseCameras(params),
         parseNumber(params, "from"),
         parseNumber(params, "to"),
+        undefined,
+        parseTags(params),
       ),
     );
   }
@@ -89,7 +113,11 @@ async function handleApi(req: Request, path: string, params: URLSearchParams): P
 
   if (path === "/api/reindex" && req.method === "POST") {
     const index = await reindex();
-    return json({ generation: index.generation, events: index.events.length });
+    return json({
+      generation: index.generation,
+      events: index.events.length,
+      tags: tagsState(),
+    });
   }
 
   if (path === "/api/logout" && req.method === "POST") {
@@ -151,6 +179,12 @@ console.log(
   `indexed ${index.events.length} events across ${index.cameras.length} cameras ` +
     `from ${config.tapoRoot}`,
 );
+if (config.tagsFile) {
+  const tagged = index.events.filter((e) => e.tags.length > 0).length;
+  console.log(`tags: ${tagged}/${index.events.length} events from ${config.tagsFile}`);
+} else {
+  console.log("TAGS_FILE is unset — event tagging is off");
+}
 if (auth.enabled) {
   console.log(`authentication on, sessions last ${config.sessionTtlS}s`);
 } else {
@@ -167,7 +201,11 @@ Deno.serve({ port: config.port, hostname: config.host }, async (req, info) => {
     // container probe still reports the app as up. It also reports whether a
     // password arrived, which is the quickest way to tell a stale image (this
     // route 404s) from an unset AUTH_PASSWORD (`auth: "off"`).
-    if (path === "/api/health") return json({ ok: true, auth: auth.enabled ? "on" : "off" });
+    if (path === "/api/health") {
+      // `tags` here is the quickest way to tell "the tagger has not run" from
+      // "the sidecar is mounted but unreadable" without shelling into the box.
+      return json({ ok: true, auth: auth.enabled ? "on" : "off", tags: tagsState() });
+    }
 
     if (path === "/api/login" && req.method === "POST") {
       return await auth.handleLogin(req, info.remoteAddr);

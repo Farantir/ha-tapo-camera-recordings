@@ -96,7 +96,7 @@ async function syncToScroll() {
   const token = ++pending;
   let events;
   try {
-    events = await fetchDayEvents(next.day, next.start, state.cameras);
+    events = await fetchDayEvents(next.day, next.start, state.cameras, state.tags);
   } catch {
     return;
   }
