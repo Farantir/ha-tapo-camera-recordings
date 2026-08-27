@@ -32,6 +32,13 @@ export interface TapoEvent {
    * the UI shows on the row. Always one of `tags`, so filtering on it works.
    */
   label: string | null;
+  /**
+   * Version stamp of the thumbnail the tagger cut from the frame the subject
+   * was actually in; null when there is none. The UI shows that picture
+   * instead of the camera's own still, which is taken before the subject
+   * arrives and is usually of nothing at all.
+   */
+  eventThumb: number | null;
 }
 
 export interface CameraInfo {

@@ -22,7 +22,9 @@ services:
       # TAPO_HOST_PATH is your tapo backup folder on the Docker host.
       - ${TAPO_HOST_PATH:-/volume1/tapo}:/data:ro
       # The tagger writes here, the viewer only reads. This is the one channel
-      # between them; the footage mount stays read-only for both.
+      # between them; the footage mount stays read-only for both. It carries
+      # the sidecar and the thumbnails the tagger cuts from each event, which
+      # the viewer shows in place of the camera's own stills.
       - tags:/tags:ro
     environment:
       # set that to your local timezone as tapo uses that for its timestamps
@@ -78,10 +80,28 @@ services:
       # them and picks these; more frames means a better chance of catching a
       # two-second visit, at a linear cost.
       MAX_FRAMES: "${TAGGER_MAX_FRAMES:-24}"
+      # Half those frames go to the busiest moments in the clip. This is how
+      # far apart two of them have to be, in seconds — without a gap they all
+      # land on the same second, because motion rises and falls smoothly.
+      PEAK_GAP_S: "${TAGGER_PEAK_GAP_S:-2.0}"
       # How much of the probability mass a taxon needs before the tag descends
       # to it. Lower means more species names and more mistakes; higher means
       # more events labelled just "animal" or a family.
       SPECIES_CONF: "${TAGGER_SPECIES_CONF:-0.55}"
+      # --- how eager the tagger is to call something an event ---------------
+      # Between them these four decide whether a clip is a sighting or
+      # no_event. Lower values catch more of the brief, distant and blurred
+      # visitors at the cost of the odd branch tagged as wildlife.
+      #   DETECT_CONF           a box has to score this to be looked at at all
+      #   TRUST_DETECTOR        above this the detector's own class stands even
+      #                         when the species classifier calls the crop blank
+      #   STRONG_SCORE          one frame is enough for a person or a vehicle
+      #   STRONG_SCORE_WILDLIFE the same for an animal, held higher because a
+      #                         lone weak box in a hedge is usually a branch
+      DETECT_CONF: "${TAGGER_DETECT_CONF:-0.25}"
+      TRUST_DETECTOR: "${TAGGER_TRUST_DETECTOR:-0.35}"
+      STRONG_SCORE: "${TAGGER_STRONG_SCORE:-0.45}"
+      STRONG_SCORE_WILDLIFE: "${TAGGER_STRONG_SCORE_WILDLIFE:-0.75}"
       # Cap ONNX Runtime's threads on a small box so tagging does not starve
       # the viewer. 0 lets it decide.
       THREADS: "${TAGGER_THREADS:-0}"

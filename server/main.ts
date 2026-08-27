@@ -127,26 +127,46 @@ async function handleApi(req: Request, path: string, params: URLSearchParams): P
   return json({ error: "unknown endpoint" }, 404);
 }
 
-/** `/media/<camera>/<thumbs|videos>/<key>.<ext>` */
+/**
+ * Which directory a media kind is served from. `event-thumbs` is the tagger's
+ * own still, cut from the frame the subject was actually in; it lives beside
+ * the sidecar rather than in the footage, which stays read-only.
+ */
+function mediaRoot(kind: string): { dir: string; ext: string; nested: boolean } | null {
+  if (kind === "thumbs") return { dir: config.tapoRoot, ext: ".jpg", nested: true };
+  if (kind === "videos") return { dir: config.tapoRoot, ext: ".mp4", nested: true };
+  if (kind === "event-thumbs" && config.eventThumbsDir) {
+    return { dir: config.eventThumbsDir, ext: ".jpg", nested: false };
+  }
+  return null;
+}
+
+/** `/media/<camera>/<thumbs|videos|event-thumbs>/<key>.<ext>` */
 async function handleMedia(req: Request, path: string): Promise<Response> {
   const segments = path.split("/").slice(2);
   if (segments.length !== 3) return new Response("not found", { status: 404 });
 
   const [camera, kind, filename] = segments;
-  const ext = kind === "thumbs" ? ".jpg" : kind === "videos" ? ".mp4" : null;
-  if (ext === null || !filename.endsWith(ext)) return new Response("not found", { status: 404 });
+  const source = mediaRoot(kind);
+  if (source === null || !filename.endsWith(source.ext)) {
+    return new Response("not found", { status: 404 });
+  }
 
-  const key = filename.slice(0, -ext.length);
+  const key = filename.slice(0, -source.ext.length);
   // Never build a path from unvalidated input: the camera must be one we
   // actually discovered, and the key must be exactly two 10-digit epochs.
   const known = listCameras().some((c) => c.id === camera);
   if (!known || !isValidKey(key)) return new Response("not found", { status: 404 });
 
-  const file = join(config.tapoRoot, camera, kind, filename);
+  const file = source.nested
+    ? join(source.dir, camera, kind, filename)
+    : join(source.dir, camera, filename);
   try {
     const response = await serveFile(req, file);
     // Filenames are immutable, so clients may cache them indefinitely. This is
-    // what makes lazy loading cheap when scrolling back up the list.
+    // what makes lazy loading cheap when scrolling back up the list. A tagger
+    // thumbnail can be rewritten in place, which is why its URL carries the
+    // stamp of the run that produced it.
     if (response.status === 200 || response.status === 206) {
       response.headers.set("cache-control", "public, max-age=31536000, immutable");
     }

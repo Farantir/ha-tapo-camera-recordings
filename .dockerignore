@@ -4,4 +4,6 @@ tapo/
 claude/
 server/*_test.ts
 web/*_test.ts
+tagger/
+tags/
 .env

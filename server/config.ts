@@ -10,6 +10,11 @@ function num(name: string, fallback: number): number {
   return parsed;
 }
 
+function defaultEventThumbs(): string | null {
+  const tags = Deno.env.get("TAGS_FILE");
+  return tags ? join(dirname(resolve(tags)), "thumbs") : null;
+}
+
 export const config = {
   projectRoot,
   tapoRoot: resolve(Deno.env.get("TAPO_ROOT") ?? join(projectRoot, "tapo")),
@@ -42,6 +47,14 @@ export const config = {
    * the two processes meet on a separate shared volume. Empty disables tags.
    */
   tagsFile: Deno.env.get("TAGS_FILE") || null,
+
+  /**
+   * Thumbnails the tagger cut from the moment a subject was actually on
+   * screen, which the viewer prefers over the camera's own still. It sits
+   * beside the sidecar by default, so the volume that is already mounted for
+   * tags carries these too and nothing else has to be wired up.
+   */
+  eventThumbsDir: Deno.env.get("EVENT_THUMBS_DIR") || defaultEventThumbs(),
 
   /** Shared login password. Empty disables authentication entirely. */
   authPassword: Deno.env.get("AUTH_PASSWORD") ?? "",

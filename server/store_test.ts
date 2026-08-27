@@ -19,6 +19,7 @@ function makeEvent(camera: string, start: number, duration = 60, tags: string[] 
     secondsOfDay: parts.secondsOfDay,
     tags,
     label: tags.at(-1) ?? null,
+    eventThumb: null,
   };
 }
 

@@ -70,6 +70,14 @@ class StoreTest(unittest.TestCase):
             json.dump({"version": 99, "events": {"a/1-2": PAYLOAD}}, fh)
         self.assertEqual(TagStore(self.path).load().events, {})
 
+    def test_an_older_version_is_re_tagged_rather_than_carried_over(self):
+        # An upgrade that changes what counts as an event has to re-analyse
+        # what is already in the file; the videos themselves have not changed,
+        # so nothing else would ever trigger it.
+        with open(self.path, "w", encoding="utf-8") as fh:
+            json.dump({"version": 1, "events": {"a/1-2": PAYLOAD}}, fh)
+        self.assertEqual(TagStore(self.path).load().events, {})
+
     def test_save_leaves_no_temp_files_behind(self):
         store = TagStore(self.path)
         store.put("a/1-2", PAYLOAD, "1:1")

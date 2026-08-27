@@ -58,7 +58,14 @@ Deno.test("tampered and malformed tokens are rejected", async () => {
 
   // A later expiry with the original signature must not pass.
   assertEquals(await auth.verifyToken(`${Number(payload) + 86400}.${mac}`), null);
-  assertEquals(await auth.verifyToken(`${payload}.${mac.slice(0, -1)}A`), null);
+  // Tamper with the *first* character, and make sure it actually changes.
+  // The signature is 32 bytes in 43 base64url characters, so the last
+  // character carries four significant bits and two that decode to nothing —
+  // rewriting it can leave the decoded MAC byte-for-byte identical, and the
+  // token then verifies exactly as it should. Every bit of the first character
+  // counts.
+  const flipped = (mac.startsWith("A") ? "B" : "A") + mac.slice(1);
+  assertEquals(await auth.verifyToken(`${payload}.${flipped}`), null);
   assertEquals(await auth.verifyToken(payload), null);
   assertEquals(await auth.verifyToken(""), null);
   assertEquals(await auth.verifyToken(undefined), null);

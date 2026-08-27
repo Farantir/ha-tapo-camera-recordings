@@ -11,6 +11,10 @@ export interface EventTags {
   label?: string;
   rank?: string;
   confidence?: number;
+  /** True when the tagger wrote a thumbnail for this event. */
+  thumb?: boolean;
+  /** When it did so — doubles as the cache key for that thumbnail's URL. */
+  taggedAt?: number;
 }
 
 export interface TagsFile {
@@ -35,9 +39,16 @@ export const ROOT_TAGS = ["no_event", "animal", "human", "vehicle"] as const;
 export interface ResolvedTags {
   tags: string[];
   label: string | null;
+  /**
+   * Version stamp of the tagger's own thumbnail for this event, or null when
+   * there is none and the camera's still is all there is. It goes into the
+   * image URL so a re-analysed clip is re-fetched rather than served from the
+   * browser cache under a filename that never changes.
+   */
+  eventThumb: number | null;
 }
 
-const NONE: ResolvedTags = { tags: [], label: null };
+const NONE: ResolvedTags = { tags: [], label: null, eventThumb: null };
 
 let byId = new Map<string, ResolvedTags>();
 let loadedAt = 0;
@@ -72,7 +83,12 @@ function parse(raw: string, file: string): Map<string, ResolvedTags> {
     const label = typeof entry.label === "string" && entry.label.trim()
       ? entry.label.trim().toLowerCase()
       : tags[tags.length - 1];
-    next.set(id, { tags: [...new Set(tags)], label });
+    const taggedAt = typeof entry.taggedAt === "number" ? entry.taggedAt : 0;
+    next.set(id, {
+      tags: [...new Set(tags)],
+      label,
+      eventThumb: entry.thumb === true ? taggedAt : null,
+    });
   }
   return next;
 }
@@ -121,7 +137,7 @@ export function setTags(entries: Record<string, string[]>): void {
   byId = new Map(
     Object.entries(entries).map((
       [id, tags],
-    ) => [id, { tags: [...new Set(tags)], label: tags.at(-1) ?? null }]),
+    ) => [id, { tags: [...new Set(tags)], label: tags.at(-1) ?? null, eventThumb: null }]),
   );
   loadedAt = Date.now();
 }

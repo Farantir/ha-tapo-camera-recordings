@@ -49,18 +49,19 @@ Put the recordings in `./tapo`, or set `TAPO_ROOT` elsewhere.
 
 All optional, all environment variables.
 
-| Variable            | Default         | Meaning                                        |
-| ------------------- | --------------- | ---------------------------------------------- |
-| `TAPO_ROOT`         | `./tapo`        | Directory holding the per-camera folders       |
-| `PORT`              | `8000`          | Listen port                                    |
-| `HOST`              | `127.0.0.1`     | Bind address; a container needs `0.0.0.0`      |
-| `DISPLAY_TZ`        | `Europe/Berlin` | Timezone for day/hour bucketing                |
-| `TS_OFFSET_SECONDS` | `-3600`         | Correction applied to filename timestamps      |
-| `RESCAN_INTERVAL_S` | `1800`          | Seconds between background rescans             |
-| `TAGS_FILE`         | _(empty)_       | Sidecar written by the tagger; empty = no tags |
-| `AUTH_PASSWORD`     | _(empty)_       | Shared login password; empty = no login        |
-| `SESSION_TTL_S`     | `43200`         | How long a login lasts (12 h)                  |
-| `AUTH_SECRET`       | _(random)_      | Key the session cookie is signed with          |
+| Variable            | Default         | Meaning                                            |
+| ------------------- | --------------- | -------------------------------------------------- |
+| `TAPO_ROOT`         | `./tapo`        | Directory holding the per-camera folders           |
+| `PORT`              | `8000`          | Listen port                                        |
+| `HOST`              | `127.0.0.1`     | Bind address; a container needs `0.0.0.0`          |
+| `DISPLAY_TZ`        | `Europe/Berlin` | Timezone for day/hour bucketing                    |
+| `TS_OFFSET_SECONDS` | `-3600`         | Correction applied to filename timestamps          |
+| `RESCAN_INTERVAL_S` | `1800`          | Seconds between background rescans                 |
+| `TAGS_FILE`         | _(empty)_       | Sidecar written by the tagger; empty = no tags     |
+| `EVENT_THUMBS_DIR`  | _(beside tags)_ | The tagger's own thumbnails; overlays the camera's |
+| `AUTH_PASSWORD`     | _(empty)_       | Shared login password; empty = no login            |
+| `SESSION_TTL_S`     | `43200`         | How long a login lasts (12 h)                      |
+| `AUTH_SECRET`       | _(random)_      | Key the session cookie is signed with              |
 
 See [Authentication](#authentication) for the three `AUTH_*`/`SESSION_*` variables.
 
@@ -72,7 +73,16 @@ with DST disabled, so a raw filename timestamp runs one hour ahead of true UTC. 
 
 Optional. Point `TAGS_FILE` at a sidecar produced by the tagger (`tagger/`) and the viewer grows a
 second row of filter chips: **No event**, **Animal**, **Human**, **Vehicle**, plus whatever species
-the classifier actually resolved
+the classifier actually resolved.
+
+The tagger also replaces the thumbnails. The camera saves its still the instant recording starts,
+which is the one moment whatever triggered it is reliably _not_ in shot yet, so a scrolled list is a
+list of empty driveways. The detector already knows which frame it found the subject in and where in
+that frame it was, so the tagger cuts a second still from exactly there and writes it to
+`EVENT_THUMBS_DIR` — by default a `thumbs/` folder beside `TAGS_FILE`, on the volume the viewer
+already mounts. The viewer prefers those wherever they exist and falls back to the camera's own
+picture everywhere else, so the directory is a pure overlay: delete it and you lose nothing but the
+better pictures.
 
 
 ### Running it
@@ -95,11 +105,6 @@ pip install -r requirements.txt
 MODELS_DIR=./models TAPO_ROOT=../tapo TAGS_FILE=../tags/tags.json python3 tag_events.py
 python3 -m unittest discover -s . -v               # tests
 ```
-
-Work is incremental: a clip is analysed once and re-analysed only if its size or mtime changes, and
-**entries whose video has disappeared are pruned on every pass**, so the sidecar tracks the backup
-instead of growing without bound. Newest recordings are tagged first, so a long backfill produces
-useful results immediately. Interrupting it is safe — progress is written every ten clips.
 
 
 ## Authentication

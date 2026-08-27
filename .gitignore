@@ -5,6 +5,12 @@ tapo/
 # Working notes from the build-out — not part of the deliverable.
 claude/
 
+# Tagger output and downloaded models — both are generated, and the models are
+# ~340 MB. In a container these live on named volumes instead.
+tags/
+tagger/models/
+__pycache__/
+
 .DS_Store
 
 .env

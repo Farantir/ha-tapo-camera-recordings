@@ -24,10 +24,13 @@ import taxonomy
 
 log = logging.getLogger("tagger.pipeline")
 
-# COCO ids the detector may propose. The class is only used to decide whether a
-# crop is worth classifying — SpeciesNet has the final say on what it is.
+# COCO ids the detector may propose, mapped onto the four kinds the viewer
+# filters by. SpeciesNet normally has the say on what a crop is; this is the
+# answer that stands when it comes back "blank" on a box the detector was sure
+# about — see analyse.decide. COCO has no hedgehog or squirrel, so its own
+# animal classes are never trusted beyond "an animal".
 COCO_SUBJECTS = {
-    0: "person",
+    0: "human",
     1: "vehicle", 2: "vehicle", 3: "vehicle", 5: "vehicle", 7: "vehicle",
     14: "animal", 15: "animal", 16: "animal", 17: "animal", 18: "animal",
     19: "animal", 20: "animal", 21: "animal", 22: "animal", 23: "animal",
@@ -107,8 +110,28 @@ def motion_scores(frames):
     return scores
 
 
-def choose_frames(scores, budget):
-    """Half the budget on the busiest frames, half spread evenly.
+def _peaks(scores, wanted, gap):
+    """The busiest frames, no two of them within `gap` frames of each other.
+
+    Taking the top-scoring frames outright does not work: motion rises and
+    falls smoothly, so the highest dozen are almost always the same second of
+    the same event, sampled over and over. Half the budget then buys one
+    moment. Suppressing the neighbourhood of each pick spends it on separate
+    moments instead — which is how a clip that shows someone at 3s and again at
+    13s gets looked at twice rather than eleven times at 20s.
+    """
+    taken = []
+    for index in np.argsort(scores)[::-1]:
+        index = int(index)
+        if all(abs(index - other) >= gap for other in taken):
+            taken.append(index)
+            if len(taken) >= wanted:
+                break
+    return taken
+
+
+def choose_frames(scores, budget, gap=1):
+    """Half the budget on separate bursts of motion, half spread evenly.
 
     A subject present for the whole clip is baked into the median background
     and barely registers as motion, so the even spread is what catches a parked
@@ -117,9 +140,8 @@ def choose_frames(scores, budget):
     count = len(scores)
     if count <= budget:
         return list(range(count))
-    half = max(1, budget // 2)
-    busiest = [int(i) for i in np.argsort(scores)[-half:]]
-    spread = [int(i) for i in np.linspace(0, count - 1, budget - half).astype(int)]
+    busiest = _peaks(scores, max(1, budget // 2), gap)
+    spread = [int(i) for i in np.linspace(0, count - 1, budget - len(busiest)).astype(int)]
     return sorted(set(busiest + spread))
 
 
@@ -142,6 +164,29 @@ def crop_box(image, box, pad):
     ))
 
 
+def letterbox(image, size=DETECTOR_SIZE):
+    """Fit the frame into a square, padded rather than stretched.
+
+    Squashing a 16:9 frame into a square compresses it four times horizontally
+    against two and a quarter vertically, and the detector was trained on
+    aspect-preserved input — a squirrel arrives squashed to a bit over half the
+    width of any squirrel it has ever seen. Measured on the clips this got
+    wrong: a squirrel 0.07 -> 0.54, a person at night 0.60 -> 0.90, another
+    animal 0.19 -> 0.85. All three had been under the threshold, so the clips
+    they are in came back as "no event".
+
+    Returns the canvas plus what it did, so boxes can be mapped back onto the
+    original frame.
+    """
+    scale = min(size / image.width, size / image.height)
+    width, height = round(image.width * scale), round(image.height * scale)
+    # Grey, the padding value YOLO is trained with; black reads as content.
+    canvas = Image.new("RGB", (size, size), (114, 114, 114))
+    pad_x, pad_y = (size - width) // 2, (size - height) // 2
+    canvas.paste(image.resize((width, height), Image.BILINEAR), (pad_x, pad_y))
+    return canvas, scale, pad_x, pad_y
+
+
 class Models:
     def __init__(self, detector_path, classifier_path, labels_path, threads=0):
         opts = ort.SessionOptions()
@@ -156,9 +201,8 @@ class Models:
 
     def detect(self, image, min_score):
         """YOLOv10 emits already-deduplicated boxes, so there is no NMS here."""
-        width, height = image.size
-        resized = image.resize((DETECTOR_SIZE, DETECTOR_SIZE), Image.BILINEAR)
-        batch = np.asarray(resized, dtype=np.float32).transpose(2, 0, 1)[None] / 255.0
+        canvas, scale, pad_x, pad_y = letterbox(image)
+        batch = np.asarray(canvas, dtype=np.float32).transpose(2, 0, 1)[None] / 255.0
         out = self.detector.run(None, {self._det_input: batch})[0][0]
         found = []
         for x1, y1, x2, y2, score, cls in out:
@@ -166,8 +210,8 @@ class Models:
             if kind is None or score < min_score:
                 continue
             box = (
-                x1 / DETECTOR_SIZE * width, y1 / DETECTOR_SIZE * height,
-                x2 / DETECTOR_SIZE * width, y2 / DETECTOR_SIZE * height,
+                (x1 - pad_x) / scale, (y1 - pad_y) / scale,
+                (x2 - pad_x) / scale, (y2 - pad_y) / scale,
             )
             found.append((kind, float(score), box))
         return found

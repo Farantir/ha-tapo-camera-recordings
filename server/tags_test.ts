@@ -19,6 +19,7 @@ function ev(camera: string, start: number, tags: string[]): TapoEvent {
     secondsOfDay: parts.secondsOfDay,
     tags,
     label: tags.at(-1) ?? null,
+    eventThumb: null,
   };
 }
 

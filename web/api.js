@@ -65,5 +65,25 @@ export async function logout() {
   location.replace("/login");
 }
 
-export const thumbUrl = (event) => `/media/${event.camera}/thumbs/${event.key}.jpg`;
+/** The still the camera saved, full sensor resolution, taken as recording began. */
+export const cameraThumbUrl = (event) => `/media/${event.camera}/thumbs/${event.key}.jpg`;
+
+/**
+ * The still the tagger cut from the frame its detector actually found the
+ * subject in. The camera's own picture is taken the instant recording starts —
+ * before whoever triggered it has walked into shot — so a list of them is a
+ * list of empty driveways. The version stamp is in the URL because this is the
+ * one media file that can be rewritten in place, when a clip is re-analysed;
+ * every other filename here is immutable.
+ */
+export const eventThumbUrl = (event) =>
+  `/media/${event.camera}/event-thumbs/${event.key}.jpg?v=${event.eventThumb}`;
+
+/** What the list shows: the tagger's picture when there is one. */
+export const thumbUrl = (event) =>
+  event.eventThumb != null ? eventThumbUrl(event) : cameraThumbUrl(event);
+
+/** True when this event has a picture of any kind. */
+export const hasThumb = (event) => event.hasThumb || event.eventThumb != null;
+
 export const videoUrl = (event) => `/media/${event.camera}/videos/${event.key}.mp4`;

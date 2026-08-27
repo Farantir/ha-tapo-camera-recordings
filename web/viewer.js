@@ -1,4 +1,4 @@
-import { thumbUrl, videoUrl } from "./api.js";
+import { cameraThumbUrl, hasThumb, thumbUrl, videoUrl } from "./api.js";
 import { displayLabel } from "./chips.js";
 import { createDayTimeline } from "./daytimeline.js";
 import { fetchDayEvents } from "./days.js";
@@ -164,15 +164,17 @@ function renderStage(event) {
     video.autoplay = true;
     video.playsInline = true;
     video.preload = "metadata";
-    if (event.hasThumb) video.poster = thumbUrl(event);
+    // Full sensor resolution wins on a stage this size, and the poster is only
+    // on screen until the clip starts playing anyway.
+    if (event.hasThumb) video.poster = cameraThumbUrl(event);
     video.src = videoUrl(event);
     stage.appendChild(video);
     return;
   }
 
-  if (event.hasThumb) {
+  if (hasThumb(event)) {
     const img = document.createElement("img");
-    img.src = thumbUrl(event);
+    img.src = event.hasThumb ? cameraThumbUrl(event) : thumbUrl(event);
     img.alt = "";
     stage.appendChild(img);
   }

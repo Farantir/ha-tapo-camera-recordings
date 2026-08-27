@@ -1,4 +1,4 @@
-import { fetchEvents, thumbUrl } from "./api.js";
+import { cameraThumbUrl, fetchEvents, hasThumb, thumbUrl } from "./api.js";
 import { displayLabel, tagLabel } from "./chips.js";
 import { cameraColor } from "./colors.js";
 import { clock, dayHeading, duration, plural, relativeAge } from "./format.js";
@@ -135,15 +135,28 @@ function buildRow(event) {
   btn.dataset.id = event.id;
 
   const thumb = document.createElement("div");
-  thumb.className = "thumb" + (event.hasThumb ? "" : " missing");
+  const pictured = hasThumb(event);
+  thumb.className = "thumb" + (pictured ? "" : " missing");
 
   let thumbBox = null;
-  if (event.hasThumb) {
+  if (pictured) {
     thumb.dataset.src = thumbUrl(event);
     const img = document.createElement("img");
     img.alt = "";
     img.decoding = "async";
     img.addEventListener("load", () => img.classList.add("ready"));
+    if (event.eventThumb != null && event.hasThumb) {
+      // The tagger's thumbnails live on their own volume and can be cleared
+      // independently of the sidecar that lists them. Fall back to the
+      // camera's own picture rather than leaving a grey rectangle.
+      img.addEventListener("error", () => {
+        // The box holds the URL the lazy loader re-attaches from, so it has to
+        // change too — otherwise the missing picture comes back the next time
+        // this row scrolls into view.
+        thumb.dataset.src = cameraThumbUrl(event);
+        img.src = thumb.dataset.src;
+      }, { once: true });
+    }
     thumb.appendChild(img);
     thumbBox = thumb;
   }

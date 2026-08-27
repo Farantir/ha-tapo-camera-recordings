@@ -1,7 +1,8 @@
 """The tags sidecar: load, prune, write atomically.
 
 The viewer only ever reads this file, and the footage mount stays read-only, so
-this is the one place the two processes meet.
+this and the thumbnail directory beside it are the only places the two
+processes meet.
 """
 
 import json
@@ -12,7 +13,12 @@ import time
 
 log = logging.getLogger("tagger.store")
 
-VERSION = 1
+# 2 added the per-event thumbnail flag, and came with a reworked decision about
+# what counts as an event. Bumping it makes an existing sidecar rebuild itself
+# on the first run after an upgrade, which is what re-tags the backlog and cuts
+# the thumbnails for it — otherwise every clip already in the file would keep
+# its old answer forever, because its video has not changed.
+VERSION = 2
 
 
 class TagStore:
@@ -33,9 +39,18 @@ class TagStore:
             # Better to redo the work than to serve tags we cannot parse.
             log.warning("%s unreadable (%s) — starting a fresh index", self.path, err)
             return self
+        if not isinstance(data, dict):
+            # Valid JSON, but not a sidecar — a bare list or string would
+            # otherwise blow up on the first .get() below.
+            log.warning("%s is not a tags file — starting a fresh index", self.path)
+            return self
+        # Anything that is not exactly this version is discarded and rebuilt:
+        # a missing number means it predates versioning, an older one means the
+        # rules that produced it have changed, and a newer one is a format this
+        # build does not know how to read.
         if data.get("version") != VERSION:
-            log.warning("%s is version %s, expected %s — rebuilding", self.path,
-                        data.get("version"), VERSION)
+            log.warning("%s is version %s, expected %s — dropping it and re-tagging "
+                        "every clip", self.path, data.get("version"), VERSION)
             return self
         events = data.get("events")
         if isinstance(events, dict):
